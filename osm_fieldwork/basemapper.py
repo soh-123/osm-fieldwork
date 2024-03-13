@@ -28,6 +28,7 @@ import sys
 import threading
 from pathlib import Path
 from typing import Union
+from io import BytesIO
 
 import geojson
 import mercantile
