@@ -25,6 +25,8 @@ import shutil
 
 from osm_fieldwork.basemapper import BaseMapper
 from osm_fieldwork.sqlite import DataFile
+from io import BytesIO
+
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,11 @@ rootdir = os.path.dirname(os.path.abspath(__file__))
 boundary = f"{rootdir}/testdata/Rollinsville.geojson"
 outfile = f"{rootdir}/testdata/rollinsville.mbtiles"
 base = "./tiles"
+
+with open(boundary, "rb") as geojson_file:
+    boundary = geojson_file.read()  # read as a `bytes` object.
+    boundary = BytesIO(boundary)
+
 # boundary = open(infile, "r")
 # poly = geojson.load(boundary)
 # if "features" in poly:

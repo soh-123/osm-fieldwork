@@ -26,9 +26,9 @@ import queue
 import re
 import sys
 import threading
+from io import BytesIO
 from pathlib import Path
 from typing import Union
-from io import BytesIO
 
 import geojson
 import mercantile
@@ -273,7 +273,7 @@ class BaseMapper(object):
 
     def makeBbox(
         self,
-        boundary: str,
+        boundary: BytesIO,
     ) -> tuple[float, float, float, float]:
         """Make a bounding box from a shapely geometry.
 
@@ -284,7 +284,7 @@ class BaseMapper(object):
         Returns:
             (list): The bounding box coordinates
         """
-        if not boundary.lower().endswith((".json", ".geojson")):
+        if isinstance(boundary, str):
             # Is BBOX string
             try:
                 if "," in boundary:
@@ -305,30 +305,35 @@ class BaseMapper(object):
                 log.error(msg)
                 raise ValueError(msg) from None
 
-        log.debug(f"Reading geojson file: {boundary}")
-        with open(boundary, "r") as f:
-            poly = geojson.load(f)
-        if "features" in poly:
-            geometry = shape(poly["features"][0]["geometry"])
-        elif "geometry" in poly:
-            geometry = shape(poly["geometry"])
+        elif isinstance(boundary, BytesIO):
+            log.debug(f"Reading BytesIO: {boundary}")
+            poly = geojson.load(boundary)
+            if "features" in poly:
+                geometry = shape(poly["features"][0]["geometry"])
+            elif "geometry" in poly:
+                geometry = shape(poly["geometry"])
+            else:
+                geometry = shape(poly)
+
+            if isinstance(geometry, list):
+                # Multiple geometries
+                log.debug("Creating union of multiple bbox geoms")
+                geometry = unary_union(geometry)
+
+            if geometry.is_empty:
+                msg = f"No bbox extracted from {geometry}"
+                log.error(msg)
+                raise ValueError(msg) from None
+
+            bbox = geometry.bounds
+            # left, bottom, right, top
+            # minX, minY, maxX, maxY
+            return bbox
+
         else:
-            geometry = shape(poly)
-
-        if isinstance(geometry, list):
-            # Multiple geometries
-            log.debug("Creating union of multiple bbox geoms")
-            geometry = unary_union(geometry)
-
-        if geometry.is_empty:
-            msg = f"No bbox extracted from {geometry}"
+            msg = f"Unknown boundary type: {type(boundary)}"
             log.error(msg)
             raise ValueError(msg) from None
-
-        bbox = geometry.bounds
-        # left, bottom, right, top
-        # minX, minY, maxX, maxY
-        return bbox
 
 
 def tileid_from_y_tile(filepath: Union[Path | str]):
@@ -586,6 +591,11 @@ def main():
         log.error("")
         parser.print_help()
         quit()
+
+    if boundary_parsed.lower().endswith(".geojson"):
+        with open(boundary_parsed, "rb") as geojson_file:
+            boundary_parsed = geojson_file.read()  # read as a `bytes` object.
+            boundary_parsed = BytesIO(boundary_parsed)  # add to a BytesIO wrapper
 
     create_basemap_file(
         verbose=args.verbose,
