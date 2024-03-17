@@ -35,10 +35,6 @@ boundary = f"{rootdir}/testdata/Rollinsville.geojson"
 outfile = f"{rootdir}/testdata/rollinsville.mbtiles"
 base = "./tiles"
 
-with open(boundary, "rb") as geojson_file:
-    boundary = geojson_file.read()  # read as a `bytes` object.
-    boundary = BytesIO(boundary)
-
 # boundary = open(infile, "r")
 # poly = geojson.load(boundary)
 # if "features" in poly:
@@ -49,10 +45,13 @@ with open(boundary, "rb") as geojson_file:
 #    geometry = shape(poly)
 
 
-def test_create():
+def test_create_boundary_bytesio():
     """See if the file got loaded."""
+    with open(boundary, "rb") as geojson_file:
+        boundary_bytesio = geojson_file.read()  # read as a `bytes` object.
+        boundary_bytesio = BytesIO(boundary_bytesio)
     hits = 0
-    basemap = BaseMapper(boundary, base, "topo", False)
+    basemap = BaseMapper(boundary_bytesio, base, "topo", False)
     tiles = list()
     for level in [8, 9, 10, 11, 12]:
         basemap.getTiles(level)
@@ -72,6 +71,57 @@ def test_create():
 
     assert hits == 2
 
+def test_valid_boundary_string():
+    """See if the file got loaded."""
+    boundary_str = "-4.730494,41.650541,-4.725634,41.652874"
+    hits = 0
+    basemap = BaseMapper(boundary_str, base, "topo", False)
+    tiles = list()
+    for level in [8, 9, 10, 11, 12]:
+        basemap.getTiles(level)
+        tiles += basemap.tiles
+
+    if len(tiles) == 5:
+        hits += 1
+
+    if tiles[0].x == 52 and tiles[1].y == 193 and tiles[2].x == 211:
+        hits += 1
+
+    outf = DataFile(outfile, basemap.getFormat())
+    outf.writeTiles(tiles, base)
+
+    os.remove(outfile)
+    shutil.rmtree(base)
+
+    assert hits == 2
+
+def test_invalid_boundary_string():
+    """See if the file got loaded."""
+    hits = 0
+    try:
+        basemap = BaseMapper(boundary, base, "topo", False)
+        tiles = list()
+        for level in [8, 9, 10, 11, 12]:
+            basemap.getTiles(level)
+            tiles += basemap.tiles
+
+        if len(tiles) == 5:
+            hits += 1
+
+        if tiles[0].x == 52 and tiles[1].y == 193 and tiles[2].x == 211:
+            hits += 1
+
+        outf = DataFile(outfile, basemap.getFormat())
+        outf.writeTiles(tiles, base)
+
+        os.remove(outfile)
+        shutil.rmtree(base)
+    except ValueError as e:
+        hits += 1
+
+    assert hits == 1
 
 if __name__ == "__main__":
-    test_create()
+    test_create_boundary_bytesio()
+    test_valid_boundary_string()
+    test_invalid_boundary_string()
