@@ -24,6 +24,7 @@ networks:
 services:
   fieldwork:
     image: "ghcr.io/hotosm/osm-fieldwork:ci"
+    platform: linux/amd64
     build:
       target: ci
     container_name: osm-fieldwork
